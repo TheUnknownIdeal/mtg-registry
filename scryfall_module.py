@@ -1,26 +1,19 @@
 import requests
-import sys
 import time
 import json
-import matplotlib.pyplot as plt
 
+import pandas as pd
+
+import utils_df as ud
 import utils_input as ui
+
 import exchange_rates_module as rates
-import view
+from display_module import display_card_image
+
 
 usd_to_eur = 0.0
 rate_fetch_flag = False
 
-def main():
-
-    card_name = ' '.join(sys.argv[1:])
-    print(card_name)
-    #json = mkm_id_search(card_name)
-    json = name_search(card_name)
-
-    print(json)
-
-    return 0
 
 def get_card_batch(scryfall_payload, reference_time=None):
     url = "https://api.scryfall.com/cards/collection"
@@ -65,14 +58,14 @@ def get_card_batch(scryfall_payload, reference_time=None):
 
 
 # A procedure to get scryfall card data from a name 
-def query_name(query_string, attempts=3, params={}):
+def query_name(input_string, attempts=3, params={}):
     # "query": the query as a string
     # "attempts": number of total attempt to find the card
     # "params": Any additional parameters that might need to be passed along
 
-    for i in range(attempts + 1):
+    query_string = input_string
 
-            print (f"Searching '{query_string}'...")
+    for i in range(attempts + 1):
 
             # Identify card and set (set is optional)
             prints_uri, prints_set = name_search(query_string, uri_flag=True)
@@ -81,20 +74,20 @@ def query_name(query_string, attempts=3, params={}):
             if prints_uri is not None:
 
                 # Select correct version and download data
-                card_json,_,_ = get_card_prints(prints_uri, prints_set)
+                card_json = get_card_prints(prints_uri, prints_set)
 
                 if card_json:
                     return card_json
 
                 else:
-                    print(f"Card selection failed.")
+                    error_string = f"Selection failed."
                     
             else:
-                print(f"Card search failed.")
+                error_string = f"Search failed."
 
-            print(f"Attempt {i + 1} of {attempts} - give a new query")
-            query_string = input("? ")
-        
+            prompt = f"{error_string} Attempt {i + 1} of {attempts}: give a new query."
+            query_string = ui.get_typed_input(prompt, target_type="str")
+
     return {}
 
 
@@ -119,40 +112,73 @@ def name_search(input_name, uri_flag=False, verbose=True):
     url = f"https://api.scryfall.com/cards/search?q={input_name}"
 
     ret_dict, ret_uri = {}, None
-    ret_set = None
+    selected_set = None
     
+    # Call API and download data into "cards_data"
     cards_data = card_req(url, verbose=False)
+
+    # Check that return data is not empty
     if cards_data != {}:
+
         
-        # Check if there are cards returned
+        # Check if there is more than one card option returned
         if cards_data['total_cards'] > 1:
+
+            ret_indices = []
+            ret_names = []
+            ret_mana_costs = []
+
             for i,card in enumerate(cards_data['data']):
                 card_string = str(i + 1) + ". " + card['name']
-                print(card_string)
+                #print(card_string)
+                #print(json.dumps(card, indent=4))
+                card_name = card.get('name', "?")
+        
+                # Robust mana_cost check:
+                # If it's not at the top level (like a DFC), check the first face
+                mana_cost = card.get('mana_cost')
+                if mana_cost is None and 'card_faces' in card:
+                    mana_cost = card['card_faces'][0].get('mana_cost', "?")
+                elif mana_cost is None:
+                    mana_cost = "?"
 
+                ret_indices.append(i + 1)  
+                ret_names.append(card_name)
+                ret_mana_costs.append(mana_cost)
 
-            usr_input = input("? ")
-            words = usr_input.split()
+            # Create a dataframe for viewing results
+            hits_df = pd.DataFrame({
+                "index": ret_indices,
+                "name": ret_names, 
+                "mana cost": ret_mana_costs
+                })
 
-            try:
-                j = int(words[0]) - 1
-                ret_dict = cards_data['data'][j]
+            # Display query results
+            ud.display_dynamic_df(hits_df)
 
-                if uri_flag:
-                    if len(words) > 1: ret_set = words[1]
+            prompt = "Enter index to select (and optional set abbreviation, e.g., '1' or '1 mh3')"
+            usr_input = ui.get_typed_input(prompt, target_type="str")
+
+            if not usr_input:
+                print("No selection made.")
+
+            else:
+                words = usr_input.split()
+                selection_idx = int(words[0]) - 1 # Convert back to 0-based index
+                selected_set = words[1] if len(words) > 1 else None
+
+                try:
+                    ret_dict = cards_data['data'][selection_idx]
                     ret_uri = ret_dict["prints_search_uri"]
 
-            except ValueError as e:
-                print("Bad input")
+                except IndexError:
+                    print(f"Error: {words[0]} is out of range.")
 
         # No user selection needed if exactly 1 card is found.
         elif cards_data['total_cards'] == 1:
             ret_dict = cards_data['data'][0]
-
-            words = []
-            if uri_flag:
-                if len(words) > 1: ret_set = words[1]
-                ret_uri = ret_dict["prints_search_uri"]
+            ret_uri = ret_dict["prints_search_uri"]
+                
 
         elif verbose:
             print(f"No cards found.")
@@ -160,39 +186,65 @@ def name_search(input_name, uri_flag=False, verbose=True):
     elif verbose:
         print("Request failed")
 
-    if uri_flag:
-        return ret_uri, ret_set
-    else: 
-        return ret_dict, ret_set
+    # Return Logic
+    ret_uri = ret_dict.get("prints_search_uri")
+    return (ret_uri, selected_set) if uri_flag else (ret_dict, selected_set)
+
         
 def get_card_prints(url, input_set=None):
 
     prints_uri = url
     cards_data = card_req(prints_uri)
-    if not cards_data: return {}, "", ""
+    if not cards_data: return {}
 
-    matches = {} # All query hits will be stored in "matches" dict
-    match_sets = {}
+    all_cards = []
+
+    hit_ids = []
+
+    hit_indices = []
+    hit_sets = []
+    hit_set_names = []
+    hit_usd_prices = []
+    hit_usd_foil_prices = []
+    hit_usd_etched_prices = []
+    hit_eur_prices = []
+    hit_eur_foil_prices = []
 
     i = 1
     while True:
         # Iterate through first page
         for card in cards_data['data']:
-            
+
             # Check for appropriate set
             if input_set is not None and card['set'] != input_set: continue
 
-            card_string = str(i) + ". (" + card['set'] + ") "
-            card_string += card['set_name'] + ": { \""
-            for k,key in enumerate(card['prices']):
-                card_string += f"{key}\": {card['prices'][key]}"
-                if k < len(card['prices']) - 1: card_string += ", \""
-            card_string += " }"
-            print(card_string)
+            all_cards.append(card)
+
+            # Store card print information
+            hit_ids.append(card.get("id")) # Card id
+
+            hit_indices.append(i) 
+            hit_sets.append(card.get("set"))
+            hit_set_names.append(card.get("set_name"))
+
+            prices = card.get("prices")
+
+            if prices is not None:
+                hit_usd_prices.append(prices.get("usd"))
+                hit_usd_foil_prices.append(prices.get("usd_foil"))
+                hit_usd_etched_prices.append(prices.get("usd_etched"))
+                hit_eur_prices.append(prices.get("eur"))
+                hit_eur_foil_prices.append(prices.get("eur_foil"))
+            else:
+                hit_usd_prices.append(None)
+                hit_usd_foil_prices.append(None)
+                hit_usd_etched_prices.append(None)
+                hit_eur_prices.append(None)
+                hit_eur_foil_prices.append(None)
+
             
-            matches[str(i)] = card["id"]
-            match_sets[str(i)] = card["set_name"]
             i += 1
+
             
         # Check if there are more cards
         has_more = cards_data.get("has_more")
@@ -203,103 +255,83 @@ def get_card_prints(url, input_set=None):
             # If there are no more pages of cards, break the loop
             break
 
-    if (len(matches) > 1):
+    # Check if there is more than one hit
+    if (len(hit_ids) > 1):
+
+        # Create a dataframe for viewing multiple results
+        hits_df = pd.DataFrame({
+            "index": hit_indices,
+            "set": hit_sets, 
+            "set name": hit_set_names,
+            "reg usd": hit_usd_prices,
+            "foil usd": hit_usd_foil_prices,
+            "etched usd": hit_usd_etched_prices,
+            "reg eur": hit_eur_prices,
+            "foil eur": hit_eur_foil_prices
+            })
+
+        # "peek_df" will limit the length of each string
+        description = "Enter index to select, 'v 1 2' to view, or 'v- 1 5' for range"
+        ud.display_dynamic_df(ud.peek_df(hits_df))
+        print(description)
+
+
+        # 1. Create lookup maps for the user indices
+        # We use strings because input() returns strings
+        lookup = {str(i): card_id for i, card_id in zip(hit_indices, hit_ids)}
+
 
         while True:
-            usr_input = input("? ")
-            input_list = usr_input.split()
+            usr_input = ui.get_typed_input("", target_type="str", display_default=False)
+            
+            if not usr_input: 
+                return {}
 
-            # Check that input is given
-            if len(input_list) == 0: return {}, "", ""
+            parts = usr_input.split()
+            cmd = parts[0].lower()
 
-            # Check if user want cards shown (view mode "v")
-            # View individual cards by pid
-            if input_list[0] == "v":
+            # --- VIEW MODE (v or v-) ---
+            if cmd in ["v", "v-"]:
+                target_ids = []
+                
+                if cmd == "v":
+                    # Get specific IDs: v 1 3 5
+                    target_ids = [p for p in parts[1:] if p in lookup]
+                
+                elif cmd == "v-":
+                    # Get range: v- 1 5
+                    if len(parts) > 2:
+                        try:
+                            start, end = int(parts[1]), int(parts[2])
+                            target_ids = [str(i) for i in range(start, end + 1) if str(i) in lookup]
+                        except (ValueError, IndexError):
+                            pass # Stay silent and let target_ids remain None
 
-                for i,word in enumerate(input_list):
-                    if i == 0: continue
-                    uuid = matches.get(word)
-                    if uuid is None: continue
-                    fig_name = match_sets.get(word)
-                    if fig_name is None:
-                        fig_name = word + "."
-                    else:
-                        fig_name = word + ". " + fig_name
-                    view.display_card_image(uuid,card_name=fig_name) # Generates figure
-          
-                plt.show() # Displays all figures
+                    if not target_ids:
+                        # FALLBACK: Just point to the whole list of indices.
+                        # The loop below handles the "first 15" constraint.
+                        target_ids = [str(i) for i in hit_indices]
 
-            # View cards in interval (e.g. 100 - 110)
-            elif input_list[0] == "v-":
-                max_words = 15
-                try:
-                    start, end = int(input_list[1]), int(input_list[2])+1
-                    pids = list(range(start, end))
-                    words = [str(pid) for pid in pids]
+                # Display the images
+                for idx in target_ids[:15]: # Cap at 15 to avoid crashing
+                    display_card_image(lookup[idx], card_name=f"{idx}")
+                
+                import matplotlib.pyplot as plt
+                plt.show()
 
-                    for i,word in enumerate(words):
-                        uuid = matches.get(word)
-                        if uuid is None: continue
-                        fig_name = match_sets.get(word)
-                        if fig_name is None:
-                            fig_name = word + "."
-                        else:
-                            fig_name = word + ". " + fig_name
-                        view.display_card_image(uuid,card_name=fig_name) # Generates figure
-                        if i == max_words:
-                            print("Max cards hit")
-                            break
+            # --- SELECTION MODE (The user just typed a number) ---
+            elif cmd in lookup:
+                #print(f"Selected: {hit_sets[cmd]}")
+                return all_cards[int(cmd) - 1]
 
-                except (ValueError, IndexError) as e:
-                    for i,word in enumerate(matches):
-                        uuid = matches.get(word)
-                        if uuid is None: continue
-                        fig_name = match_sets.get(word)
-                        if fig_name is None:
-                            fig_name = word + "."
-                        else:
-                            fig_name = word + ". " + fig_name
-                        view.display_card_image(uuid,card_name=fig_name) # Generates figure
-                        if i == max_words:
-                            print("Max cards hit")
-                            break
-
-                plt.show() # Displays all figures
- 
             else:
-                break # breaks view mode
-
-        index_version = input_list[0]
-        # Get foil info
-        if 'f' in index_version:
-            foil = "foil"
-        elif 'e' in index_version:
-            foil = "etched"
-        else:
-            foil = ""
-        # Get comment
-        if  (len(input_list) > 1):
-            comment = ' '.join(input_list[1:])
-        else:
-            comment = ""
-        # Get id
-        index_string = ''.join([char for char in index_version if char.isdigit()])
-
-        uuid = matches.get(index_string)
-        if uuid is None:
-            print("Invalid index. Please select a number from the list.")
-        else:
-            selected_json = uuid_fetch(uuid) # Download data
-
-            return selected_json, foil, comment
+                #print("Invalid index or command.")
+                pass
         
-    elif cards_data['total_cards'] == 1: 
-        card = cards_data["data"][0]
+    elif len(hit_ids) == 1: 
+            return all_cards[0]
 
-        return card, "", ""
-    else:
-        print(f"No cards found.")
-    return {}, "", ""
+    return {}
 
 def card_req(url, data=None, verbose=True):
     if data is None:
@@ -372,6 +404,3 @@ def get_price(json, version, currency="eur"):
             else:
                 price = float(price_string)
     return round(price, 2)
-
-if __name__ == '__main__':
-    main()
