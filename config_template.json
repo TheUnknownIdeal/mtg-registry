@@ -1,0 +1,53 @@
+{
+    "vault_file": "vault.csv",
+    "archive_file": "archive.csv",
+    "vault_columns": {
+                    "location": "str",
+                    "pid": "str",
+                    "id": "str",
+                    "finish": "str",
+                    "language": "str",
+                    "condition": "str",
+                    "comment": "str",
+                    "name": "str",
+                    "set_name": "str",
+                    "reserved": "boolean",
+                    "edhrec_rank": "Int64",
+                    "current date": "datetime64[ns]",
+                    "price trend usd": "float64",
+                    "price trend eur": "float64",
+                    "in date": "datetime64[ns]",
+                    "in price eur": "float64",
+                    "in trend usd": "float64",
+                    "in trend eur": "float64",
+                    "out date": "datetime64[ns]",
+                    "out price eur": "float64",
+                    "out trend usd": "float64",
+                    "out trend eur": "float64",
+                    "mana_cost": "str"
+                },
+    "timeline_file": "timeline.csv",
+    "timeline_columns" : {
+                    "date": "datetime64[ns]",
+                    "card count": "Int64",
+                    "price usd": "float64",
+                    "price eur": "float64",
+                    "price change % usd": "float64",
+                    "price change % eur": "float64",
+                    "comment": "str"
+    },
+    "activity_file": "activity.csv",
+    "activity_columns" : {
+                    "id": "str",
+                    "date": "datetime64[ns]",
+                    "in": "str",
+                    "out": "str",
+                    "comment": "str"
+    },
+    "csv_config": {
+        "sep": ";",
+        "decimal": ",",
+        "date_format": "%Y-%m-%d",
+        "encoding": "utf-8-sig"
+    }
+}
