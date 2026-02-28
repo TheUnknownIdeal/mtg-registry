@@ -19,28 +19,30 @@ import os
 
 def main():
 
-    # GET CONFIG PARAMETERS
-
+    # GET CONFIG PARAMETERS    
     config_file = sys.argv[1]
-    config_path = Path(config_file)
-    registry_dir = config_path.parent
     inputs = ui.get_parameters(config_file)
 
-    # LOAD CARD DATABASES
+    BASE_DIR = Path(__file__).resolve().parent
+    DATA_DIR = BASE_DIR / inputs["data_folder"]
+    
 
+    # LOAD CARD DATABASES
+    # Current collection
     vault_file = inputs["vault_file"]
     vault_columns = inputs["vault_columns"]
     csv_config = inputs["csv_config"]
-    vault_path = registry_dir / vault_file
+    vault_path = DATA_DIR / vault_file
     vault = ud.load_collection_to_df(vault_path, vault_columns, csv_config)
-    
+
+    # Archived cards
     archive_file = inputs["archive_file"]
-    archive_path = registry_dir / archive_file
+    archive_path = DATA_DIR / archive_file
     archive = ud.load_collection_to_df(archive_path, vault_columns, csv_config)
 
     activity_file = inputs["activity_file"]
     activity_columns = inputs["activity_columns"]
-    activity_path = registry_dir / activity_file
+    activity_path = DATA_DIR / activity_file
 
     if os.path.exists(activity_path):
         activity = ud.load_collection_to_df(activity_path, activity_columns, csv_config)
@@ -72,6 +74,7 @@ def main():
 
         # Create a new dataframe with only specified PIDs
         unassigned_inbound_df = vault[vault['pid'].isin(new_pids)].copy()
+        unassigned_inbound_df["index"] = range(1, len(unassigned_inbound_df) + 1)
 
         # Add and "out date" for the sake of viewing when displaying summaries
         if "out date" not in unassigned_inbound_df.columns:
@@ -85,6 +88,7 @@ def main():
         event_entry = { "id": new_id }
 
         peek_cols = [
+            "index",
             "name", 
             "set_name", 
             "finish", 
@@ -105,7 +109,8 @@ def main():
             # ========== INBOUND ==========
 
             # Display unassigned new cards
-            ud.display_dynamic_df(ud.peek_df(unassigned_inbound_df, columns=peek_cols))
+            title = "Unassigned Cards:"
+            ud.display_dynamic_df(ud.peek_df(unassigned_inbound_df, columns=peek_cols), title=title)
         
             # Get user input of new cards
             prompt = f"INBOUND - Select cards (e.g., 'all', '0-15', or '1 3 5'): "

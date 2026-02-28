@@ -16,27 +16,29 @@ def main():
 
     # GET CONFIG PARAMETERS    
     config_file = sys.argv[1]
-    config_path = Path(config_file)
-    registry_dir = config_path.parent
     inputs = ui.get_parameters(config_file)
+
+    BASE_DIR = Path(__file__).resolve().parent
+    DATA_DIR = BASE_DIR / inputs["data_folder"]
+    
 
     # LOAD CARD DATABASES
     # Current collection
     vault_file = inputs["vault_file"]
     vault_columns = inputs["vault_columns"]
     csv_config = inputs["csv_config"]
-    vault_path = registry_dir / vault_file
+    vault_path = DATA_DIR / vault_file
     vault = ud.load_collection_to_df(vault_path, vault_columns, csv_config)
 
     # Archived cards
     archive_file = inputs["archive_file"]
-    archive_path = registry_dir / archive_file
+    archive_path = DATA_DIR / archive_file
     archive = ud.load_collection_to_df(archive_path, vault_columns, csv_config)
 
     # History of total collection size and value
     timeline_file = inputs["timeline_file"]
     timeline_columns = inputs["timeline_columns"]
-    timeline_path = registry_dir / timeline_file
+    timeline_path = DATA_DIR / timeline_file
 
     if os.path.exists(timeline_path):
         timeline = ud.load_collection_to_df(timeline_path, timeline_columns, csv_config)

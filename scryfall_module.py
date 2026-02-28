@@ -91,7 +91,6 @@ def query_name(input_string, attempts=3, params={}):
     return {}
 
 
-
 def uuid_fetch(uuid):
     url = f"https://api.scryfall.com/cards/{uuid}"
     return card_req(url)
@@ -154,7 +153,8 @@ def name_search(input_name, uri_flag=False, verbose=True):
                 })
 
             # Display query results
-            ud.display_dynamic_df(hits_df)
+            title = f"Search results for '{input_name}':"
+            ud.display_dynamic_df(hits_df, title=title)
 
             prompt = "Enter index to select (and optional set abbreviation, e.g., '1' or '1 mh3')"
             usr_input = ui.get_typed_input(prompt, target_type="str")
@@ -197,9 +197,13 @@ def get_card_prints(url, input_set=None):
     cards_data = card_req(prints_uri)
     if not cards_data: return {}
 
+    #print(json.dumps(cards_data, indent=4))
+
     all_cards = []
 
     hit_ids = []
+
+    hit_names = []
 
     hit_indices = []
     hit_sets = []
@@ -222,6 +226,8 @@ def get_card_prints(url, input_set=None):
 
             # Store card print information
             hit_ids.append(card.get("id")) # Card id
+
+            hit_names.append(card.get("name"))
 
             hit_indices.append(i) 
             hit_sets.append(card.get("set"))
@@ -270,9 +276,14 @@ def get_card_prints(url, input_set=None):
             "foil eur": hit_eur_foil_prices
             })
 
+        # Get the name of the card by finding most common element in hit_names
+        card_name = max(set(hit_names), key=hit_names.count)
+        title = f"Prints for '{card_name}':"
+        
         # "peek_df" will limit the length of each string
+        ud.display_dynamic_df(ud.peek_df(hits_df), title=title)
+
         description = "Enter index to select, 'v 1 2' to view, or 'v- 1 5' for range"
-        ud.display_dynamic_df(ud.peek_df(hits_df))
         print(description)
 
 

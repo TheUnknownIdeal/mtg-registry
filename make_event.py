@@ -12,28 +12,30 @@ import os
 
 def main():
 
-    # GET CONFIG PARAMETERS
-
+    # GET CONFIG PARAMETERS    
     config_file = sys.argv[1]
-    config_path = Path(config_file)
-    registry_dir = config_path.parent
     inputs = ui.get_parameters(config_file)
 
-    # LOAD CARD DATABASES
+    BASE_DIR = Path(__file__).resolve().parent
+    DATA_DIR = BASE_DIR / inputs["data_folder"]
+    
 
+    # LOAD CARD DATABASES
+    # Current collection
     vault_file = inputs["vault_file"]
     vault_columns = inputs["vault_columns"]
     csv_config = inputs["csv_config"]
-    vault_path = registry_dir / vault_file
+    vault_path = DATA_DIR / vault_file
     vault = ud.load_collection_to_df(vault_path, vault_columns, csv_config)
-    
+
+    # Archived cards
     archive_file = inputs["archive_file"]
-    archive_path = registry_dir / archive_file
+    archive_path = DATA_DIR / archive_file
     archive = ud.load_collection_to_df(archive_path, vault_columns, csv_config)
 
     activity_file = inputs["activity_file"]
     activity_columns = inputs["activity_columns"]
-    activity_path = registry_dir / activity_file
+    activity_path = DATA_DIR / activity_file
     
     if os.path.exists(activity_path):
         activity = ud.load_collection_to_df(activity_path, activity_columns, csv_config)
@@ -49,7 +51,7 @@ def main():
     while True:
 
         # Create new event
-        new_id = ud.generate_next_pid(event_ids,"e")
+        new_id = ui.generate_next_pid(event_ids,"e")
 
         print(f"Beginning event {new_id}...")
         event_entry = { "id": new_id }
@@ -71,8 +73,6 @@ def main():
 
         
         # Get names of inbound cards
-        inbound_name_list = [inbound_df.loc[inbound_df['pid'] == pid, 'name'].iloc[0] for pid in inbound_pid_list]
-
         inbound_name_list = []
         if inbound_df is not None:
             inbound_name_list = [inbound_df.loc[inbound_df['pid'] == pid, 'name'].iloc[0] 
@@ -293,23 +293,33 @@ def make_card_sequence(dfs, df_col_types, cols=None, search_prompt=None):
             if col not in all_hits.columns:
                 all_hits[col] = pd.Series(dtype=df_col_types[col])
 
-        view_hits = ud.peek_df(all_hits, columns=cols)
+        # Assign indexs to rows via the "index" column
+        all_hits["index"] = range(1, len(all_hits) + 1)
+        
+        actual_cols = ["index"]
+        actual_cols.extend(cols)
+
+        view_hits = ud.peek_df(all_hits, columns=actual_cols)
 
         if len(view_hits) == 1:
             index=0
         else:
-            print("Query hits:")
-            ud.display_dynamic_df(view_hits)
+            title = f"Hits for '{query}':"
+            ud.display_dynamic_df(view_hits, title=title)
 
             prompt = f"Select index."
-            index = ui.get_typed_input(prompt, target_type="int")
+            usr_input = ui.get_typed_input(prompt, target_type="int")
 
-            if index is None:
+            if usr_input is None:
                 print("Faulty input.")
                 continue
 
+            # Convert usr_input into dataframe row index
+            index = usr_input - 1
+
         # Make sure the index is within bounds of dataframe
         if 0 <= index < len(all_hits):
+
             # Get pid from index given by user
             target_pid = all_hits.iloc[index]['pid']
 

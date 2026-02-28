@@ -1,0 +1,12 @@
+# Ignore the entire data folder (and everything inside it)
+data/
+
+# Ignore config file:
+config.json
+
+# API inside exchange rates file
+exchange_rates.json
+
+# Ignore Python's temporary cache files (keeps your repo clean)
+__pycache__/
+*.pyc

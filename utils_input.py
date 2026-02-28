@@ -86,35 +86,39 @@ def get_parameters(file_name):
     return {}
 
 def parse_smart_selection(usr_input, current_df):
-    """
-    Parses 'all', '0-5', or '1 3 5' into a list of row indices.
-    """
     usr_input = usr_input.strip().lower()
-    max_idx = len(current_df) - 1
+    max_count = len(current_df)
 
     if usr_input == 'all':
-        return list(range(len(current_df)))
+        return list(range(max_count))
 
     indices = []
-    parts = usr_input.split()
+    # Replace commas with spaces so '1, 2, 3' also works
+    parts = usr_input.replace(',', ' ').split()
     
     for part in parts:
         if '-' in part:
             try:
-                start, end = map(int, part.split('-'))
-                # Ensure we don't go out of bounds
-                indices.extend(range(start, min(end + 1, len(current_df))))
+                start_str, end_str = part.split('-', 1)
+                start, end = int(start_str), int(end_str)
+                
+                # Clamp the values to the actual size of the dataframe
+                # 1-indexed to 0-indexed conversion happens here
+                actual_start = max(0, start - 1)
+                actual_end = min(max_count, end) 
+                
+                indices.extend(range(actual_start, actual_end))
             except ValueError:
                 continue
         else:
             try:
                 idx = int(part)
-                if 0 <= idx <= max_idx:
-                    indices.append(idx)
+                if 1 <= idx <= max_count:
+                    indices.append(idx - 1)
             except ValueError:
                 continue
                 
-    return list(set(indices)) # Remove duplicates
+    return sorted(list(set(indices))) # Sorted makes processing later much easier
 
 # Make simple progress bar
 def progress_bar(iteration, total, prefix='', suffix='', length=30, fill='█'):
