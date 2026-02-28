@@ -1,4 +1,5 @@
 {
+    "data_folder": "data",
     "vault_file": "vault.csv",
     "archive_file": "archive.csv",
     "vault_columns": {
@@ -36,7 +37,7 @@
                     "price change % eur": "float64",
                     "comment": "str"
     },
-    "activity_file": "activity.csv",
+    "activity_file": "activity2.csv",
     "activity_columns" : {
                     "id": "str",
                     "date": "datetime64[ns]",
