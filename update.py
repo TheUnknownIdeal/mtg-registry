@@ -25,7 +25,7 @@ def main():
     # LOAD CARD DATABASES
     # Current collection
     vault_file = inputs["vault_file"]
-    vault_columns = inputs["vault_columns"]
+    vault_columns = inputs["data_column_types"]
     csv_config = inputs["csv_config"]
     vault_path = DATA_DIR / vault_file
     vault = ud.load_collection_to_df(vault_path, vault_columns, csv_config)
@@ -37,7 +37,7 @@ def main():
 
     # History of total collection size and value
     timeline_file = inputs["timeline_file"]
-    timeline_columns = inputs["timeline_columns"]
+    timeline_columns = inputs["timeline_column_types"]
     timeline_path = DATA_DIR / timeline_file
 
     if os.path.exists(timeline_path):

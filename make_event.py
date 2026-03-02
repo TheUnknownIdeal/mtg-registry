@@ -23,7 +23,7 @@ def main():
     # LOAD CARD DATABASES
     # Current collection
     vault_file = inputs["vault_file"]
-    vault_columns = inputs["vault_columns"]
+    vault_columns = inputs["data_column_types"]
     csv_config = inputs["csv_config"]
     vault_path = DATA_DIR / vault_file
     vault = ud.load_collection_to_df(vault_path, vault_columns, csv_config)
@@ -34,7 +34,7 @@ def main():
     archive = ud.load_collection_to_df(archive_path, vault_columns, csv_config)
 
     activity_file = inputs["activity_file"]
-    activity_columns = inputs["activity_columns"]
+    activity_columns = inputs["activity_column_types"]
     activity_path = DATA_DIR / activity_file
     
     if os.path.exists(activity_path):

@@ -15,8 +15,6 @@ import sys
 import os
 
 
-
-
 def main():
 
     # GET CONFIG PARAMETERS    
@@ -30,7 +28,7 @@ def main():
     # LOAD CARD DATABASES
     # Current collection
     vault_file = inputs["vault_file"]
-    vault_columns = inputs["vault_columns"]
+    vault_columns = inputs["data_column_types"]
     csv_config = inputs["csv_config"]
     vault_path = DATA_DIR / vault_file
     vault = ud.load_collection_to_df(vault_path, vault_columns, csv_config)
@@ -41,7 +39,7 @@ def main():
     archive = ud.load_collection_to_df(archive_path, vault_columns, csv_config)
 
     activity_file = inputs["activity_file"]
-    activity_columns = inputs["activity_columns"]
+    activity_columns = inputs["activity_column_types"]
     activity_path = DATA_DIR / activity_file
 
     if os.path.exists(activity_path):
@@ -74,7 +72,6 @@ def main():
 
         # Create a new dataframe with only specified PIDs
         unassigned_inbound_df = vault[vault['pid'].isin(new_pids)].copy()
-        unassigned_inbound_df["index"] = range(1, len(unassigned_inbound_df) + 1)
 
         # Add and "out date" for the sake of viewing when displaying summaries
         if "out date" not in unassigned_inbound_df.columns:
@@ -107,6 +104,8 @@ def main():
         if unassigned_inbound_df is not None:
 
             # ========== INBOUND ==========
+            # Set new indicies
+            unassigned_inbound_df["index"] = range(1, len(unassigned_inbound_df) + 1)
 
             # Display unassigned new cards
             title = "Unassigned Cards:"
